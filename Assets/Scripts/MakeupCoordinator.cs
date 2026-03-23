@@ -43,7 +43,7 @@ public class MakeupCoordinator : MonoBehaviour
     private BrushItem _hiddenBrushItem;
     private UIColorButton _hiddenColorButton;
     private BrushItem _pendingBrushItem;
-
+    
     private void Awake()
     {
         creamButton.OnCreamSelected += OnCreamTapped;

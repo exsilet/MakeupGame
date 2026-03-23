@@ -96,16 +96,31 @@ public class HandToolVisual : MonoBehaviour
                 break;
         }
 
-        if (tip == null || handRect == null)
+        if (tip == null || handRect == null || handRect.parent == null)
             return Vector2.zero;
 
-        Vector3 tipWorld = tip.position;
-        Vector3 handWorld = handRect.position;
+        RectTransform parentRect = handRect.parent as RectTransform;
+        if (parentRect == null)
+            return Vector2.zero;
 
-        return new Vector2(
-            tipWorld.x - handWorld.x,
-            tipWorld.y - handWorld.y
+        Vector2 handLocalPoint;
+        Vector2 tipLocalPoint;
+
+        RectTransformUtility.ScreenPointToLocalPointInRectangle(
+            parentRect,
+            RectTransformUtility.WorldToScreenPoint(null, handRect.position),
+            null,
+            out handLocalPoint
         );
+
+        RectTransformUtility.ScreenPointToLocalPointInRectangle(
+            parentRect,
+            RectTransformUtility.WorldToScreenPoint(null, tip.position),
+            null,
+            out tipLocalPoint
+        );
+
+        return tipLocalPoint - handLocalPoint;
     }
 
     public void HideTool()
