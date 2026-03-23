@@ -4,6 +4,8 @@ using UnityEngine.UI;
 
 public class CreamButton : MonoBehaviour
 {
+    [SerializeField] private RectTransform pickupSourceRect;
+    public RectTransform PickupSourceRect => pickupSourceRect;
     public RectTransform RectTransform => GetComponent<RectTransform>();
  
     public event Action OnCreamSelected;

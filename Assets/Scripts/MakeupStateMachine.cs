@@ -35,7 +35,6 @@ public class MakeupStateMachine : MonoBehaviour
         if (_currentState == newState) return;
         _currentState = newState;
         OnStateChanged?.Invoke(_currentState);
-        Debug.Log($"[StateMachine] State: {_currentState}");
     }
 
     public void SetTool(Tool newTool)
@@ -43,7 +42,6 @@ public class MakeupStateMachine : MonoBehaviour
         if (_currentTool == newTool) return;
         _currentTool = newTool;
         OnToolChanged?.Invoke(_currentTool);
-        Debug.Log($"[StateMachine] Tool: {_currentTool}");
     }
 
     public bool CanInteract() => _currentState == State.Idle;

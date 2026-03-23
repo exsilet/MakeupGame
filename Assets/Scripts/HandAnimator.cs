@@ -2,20 +2,16 @@ using System;
 using DG.Tweening;
 using UnityEngine;
 
-/// <summary>
-/// Отвечает ТОЛЬКО за анимации руки через DOTween.
-/// Все анимации — цепочки (Sequence), без корутин.
-/// </summary>
 public class HandAnimator : MonoBehaviour
 {
     [Header("Рука")]
     [SerializeField] private RectTransform handRect;
 
     [Header("Скорости (секунды)")]
-    [SerializeField] private float pickUpDuration    = 0.35f;
-    [SerializeField] private float returnDuration    = 0.35f;
-    [SerializeField] private float dipMoveDuration   = 0.2f;  // движение к палитре
-    [SerializeField] private float dipStrokeDuration = 0.1f;  // один мазок на палитре
+    [SerializeField] private float pickUpDuration    = 0.4f;
+    [SerializeField] private float returnDuration    = 0.4f;
+    [SerializeField] private float dipMoveDuration   = 0.25f;  // движение к палитре
+    [SerializeField] private float dipStrokeDuration = 0.12f;  // один мазок на палитре
     [SerializeField] private float applyMoveDuration = 0.25f; // подлёт к лицу
     [SerializeField] private float applyStrokeDuration = 0.1f;// один мазок на лице
     [SerializeField] private float lipstickCircleDuration = 0.2f; // одно круговое движение
@@ -34,24 +30,19 @@ public class HandAnimator : MonoBehaviour
     [SerializeField] private RectTransform midPosition;
 
     public event Action OnAnimationFinished;
-    public event Action OnDipCompleted; // после мазков на палитре — красим кончик
+    public event Action OnPickupReached;
+    public event Action OnDipCompleted;
 
     public RectTransform HandRect => handRect;
 
     private Sequence _currentSequence;
-
-    // =====================
-    // ПУБЛИЧНЫЕ МЕТОДЫ
-    // =====================
-
-    /// <summary>
-    /// Крем / помада: рука летит к предмету → midPosition.
-    /// </summary>
+    
     public void PlayPickUp(Vector2 itemPosition)
     {
         Stop();
         _currentSequence = DOTween.Sequence()
             .Append(handRect.DOAnchorPos(itemPosition, pickUpDuration).SetEase(Ease.InOutSine))
+            .AppendCallback(() => OnPickupReached?.Invoke())
             .AppendInterval(0.08f)
             .Append(handRect.DOAnchorPos(midPosition.anchoredPosition, pickUpDuration).SetEase(Ease.InOutSine))
             .OnComplete(() => OnAnimationFinished?.Invoke());
@@ -64,35 +55,24 @@ public class HandAnimator : MonoBehaviour
     /// 3. OnDipCompleted — красим кончик
     /// 4. Рука в midPosition
     /// </summary>
-    public void PlayDipIntoPalette(Vector2 colorButtonPosition)
+    
+    public void PlayPickBrushAndDip(Vector2 brushPosition, Vector2 palettePosition)
     {
         Stop();
 
-        Vector2 left  = colorButtonPosition + new Vector2(-dipStrokeOffset, 0);
-        Vector2 right = colorButtonPosition + new Vector2(dipStrokeOffset, 0);
+        Vector2 dipDownPoint = palettePosition + new Vector2(0f, -18f);
 
         _currentSequence = DOTween.Sequence()
-            // Летим к кнопке цвета
-            .Append(handRect.DOAnchorPos(colorButtonPosition, dipMoveDuration).SetEase(Ease.InOutSine))
-            .AppendInterval(0.05f)
-            // 3 прохода влево-вправо по цвету
-            .Append(handRect.DOAnchorPos(left,  dipStrokeDuration).SetEase(Ease.Linear))
-            .Append(handRect.DOAnchorPos(right, dipStrokeDuration).SetEase(Ease.Linear))
-            .Append(handRect.DOAnchorPos(left,  dipStrokeDuration).SetEase(Ease.Linear))
-            .Append(handRect.DOAnchorPos(right, dipStrokeDuration).SetEase(Ease.Linear))
-            .Append(handRect.DOAnchorPos(left,  dipStrokeDuration).SetEase(Ease.Linear))
-            .Append(handRect.DOAnchorPos(colorButtonPosition, dipStrokeDuration).SetEase(Ease.Linear))
-            // Кончик кисти красится
+            .Append(handRect.DOAnchorPos(brushPosition, pickUpDuration).SetEase(Ease.InOutSine))
+            .AppendCallback(() => OnPickupReached?.Invoke())
+            .Append(handRect.DOAnchorPos(palettePosition, dipMoveDuration).SetEase(Ease.InOutSine))
+            .Append(handRect.DOAnchorPos(dipDownPoint, dipStrokeDuration).SetEase(Ease.InOutSine))
+            .Append(handRect.DOAnchorPos(palettePosition, dipStrokeDuration).SetEase(Ease.InOutSine))
             .AppendCallback(() => OnDipCompleted?.Invoke())
-            .AppendInterval(0.1f)
-            // Рука фиксируется на уровне груди
-            .Append(handRect.DOAnchorPos(midPosition.anchoredPosition, dipMoveDuration).SetEase(Ease.InOutSine))
+            .Append(handRect.DOAnchorPos(midPosition.anchoredPosition, pickUpDuration).SetEase(Ease.InOutSine))
             .OnComplete(() => OnAnimationFinished?.Invoke());
     }
-
-    /// <summary>
-    /// Крем: простое касание лица.
-    /// </summary>
+    
     public void PlayApplyCream(Vector2 facePosition)
     {
         Stop();
@@ -101,35 +81,25 @@ public class HandAnimator : MonoBehaviour
             .AppendInterval(0.2f)
             .OnComplete(() => OnAnimationFinished?.Invoke());
     }
-
-    /// <summary>
-    /// Тени: кисть летит чуть выше центра лица → 3 прохода влево-вправо.
-    /// </summary>
+    
     public void PlayApplyEyeshadow(Vector2 facePosition)
     {
         Stop();
         Vector2 center = facePosition + eyeshadowOffset;
         _currentSequence = BuildFaceStrokeSequence(center);
     }
-
-    /// <summary>
-    /// Румяна: кисть летит к переносице → 3 прохода влево-вправо.
-    /// </summary>
+    
     public void PlayApplyBlush(Vector2 facePosition)
     {
         Stop();
         Vector2 center = facePosition + blushOffset;
         _currentSequence = BuildFaceStrokeSequence(center);
     }
-
-    /// <summary>
-    /// Помада: 3 круговых движения возле губ.
-    /// </summary>
+    
     public void PlayApplyLipstick(Vector2 facePosition)
     {
         Stop();
-
-        // 3 точки круга вокруг губ
+        
         Vector2 top    = facePosition + new Vector2(0,               lipstickRadius);
         Vector2 right  = facePosition + new Vector2(lipstickRadius,  0);
         Vector2 bottom = facePosition + new Vector2(0,              -lipstickRadius);
@@ -138,8 +108,7 @@ public class HandAnimator : MonoBehaviour
         _currentSequence = DOTween.Sequence()
             .Append(handRect.DOAnchorPos(facePosition, applyMoveDuration).SetEase(Ease.InOutSine))
             .AppendInterval(0.05f);
-
-        // 3 круговых прохода
+        
         for (int i = 0; i < 3; i++)
         {
             _currentSequence
@@ -154,10 +123,7 @@ public class HandAnimator : MonoBehaviour
             .Append(handRect.DOAnchorPos(facePosition, applyMoveDuration).SetEase(Ease.InOutSine))
             .OnComplete(() => OnAnimationFinished?.Invoke());
     }
-
-    /// <summary>
-    /// Крем / помада: возврат к предмету → дефолт.
-    /// </summary>
+    
     public void PlayReturn(Vector2 itemPosition)
     {
         Stop();
@@ -167,10 +133,7 @@ public class HandAnimator : MonoBehaviour
             .Append(handRect.DOAnchorPos(defaultPosition.anchoredPosition, returnDuration).SetEase(Ease.InOutSine))
             .OnComplete(() => OnAnimationFinished?.Invoke());
     }
-
-    /// <summary>
-    /// Тени / румяна: возврат сразу в дефолт.
-    /// </summary>
+    
     public void PlayReturnToDefault()
     {
         Stop();
@@ -178,11 +141,7 @@ public class HandAnimator : MonoBehaviour
             .Append(handRect.DOAnchorPos(defaultPosition.anchoredPosition, returnDuration).SetEase(Ease.InOutSine))
             .OnComplete(() => OnAnimationFinished?.Invoke());
     }
-
-    /// <summary>
-    /// Отмена — рука возвращается в дефолт немедленно (без OnAnimationFinished).
-    /// Используется когда игрок отпустил палец вне зоны лица после отмены.
-    /// </summary>
+    
     public void PlayCancelToDefault(Vector2 itemPosition, Action onComplete = null)
     {
         Stop();

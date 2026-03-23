@@ -1,25 +1,23 @@
 using UnityEngine;
+using UnityEngine.UI;
 
-/// <summary>
-/// Отвечает ТОЛЬКО за связи между скриптами через события.
-/// </summary>
 public class MakeupCoordinator : MonoBehaviour
 {
-    [Header("Скрипты")]
+    [Header("Скрипты")] 
     [SerializeField] private MakeupStateMachine stateMachine;
-    [SerializeField] private HandAnimator        handAnimator;
-    [SerializeField] private HandDragHandler     dragHandler;
-    [SerializeField] private HandToolVisual      toolVisual;
-    [SerializeField] private FaceZoneChecker     faceZoneChecker;
-    [SerializeField] private MakeupApplier       makeupApplier;
-    [SerializeField] private MakeupTabSwitcher   tabSwitcher;
-    [SerializeField] private UIDoneButton        doneButton;
+    [SerializeField] private HandAnimator handAnimator;
+    [SerializeField] private HandDragHandler dragHandler;
+    [SerializeField] private HandToolVisual toolVisual;
+    [SerializeField] private FaceZoneChecker faceZoneChecker;
+    [SerializeField] private MakeupApplier makeupApplier;
+    [SerializeField] private MakeupTabSwitcher tabSwitcher;
+    [SerializeField] private UIDoneButton doneButton;
 
     [Header("Кнопки на полке")]
-    [SerializeField] private CreamButton           creamButton;
-    [SerializeField] private UnityEngine.UI.Button loofahButton;
+    [SerializeField] private CreamButton creamButton;
+    [SerializeField] private Button loofahButton;
 
-    [Header("Кисточки в сцене (скрываются когда рука берёт)")]
+    [Header("Кисточки в сцене (скрываются когда рука берёт)")] 
     [SerializeField] private BrushItem eyeshadowBrushItem;
     [SerializeField] private BrushItem blushBrushItem;
 
@@ -29,21 +27,23 @@ public class MakeupCoordinator : MonoBehaviour
     [Header("Кнопки помады")]
     [SerializeField] private LipstickButton[] allLipstickButtons;
 
-    // Данные текущего действия
-    private Sprite _selectedFaceSprite;
-    private Color  _selectedTipColor;
+    [Header("Фиксированные точки нанесения")]
+    [SerializeField] private Vector2 creamApplyPoint;
+    [SerializeField] private Vector2 blushApplyPoint;
+    [SerializeField] private Vector2 eyeshadowApplyPoint;
+    [SerializeField] private Vector2 lipstickApplyPoint;
 
-    // Позиция возврата (null = дефолт)
+    private Sprite _selectedFaceSprite;
+    private Color _selectedTipColor;
+
     private Vector2? _returnPosition;
 
-    // Скрытые предметы
-    private CreamButton    _hiddenCreamButton;
+    private CreamButton _hiddenCreamButton;
     private LipstickButton _hiddenLipstickButton;
-    private BrushItem      _hiddenBrushItem;
+    private BrushItem _hiddenBrushItem;
+    private UIColorButton _hiddenColorButton;
+    private BrushItem _pendingBrushItem;
 
-    // =====================
-    // ИНИЦИАЛИЗАЦИЯ
-    // =====================
     private void Awake()
     {
         creamButton.OnCreamSelected += OnCreamTapped;
@@ -56,35 +56,27 @@ public class MakeupCoordinator : MonoBehaviour
             btn.OnLipstickSelected += OnLipstickButtonTapped;
 
         handAnimator.OnAnimationFinished += OnAnimationFinished;
-        handAnimator.OnDipCompleted      += OnDipCompleted;
+        handAnimator.OnDipCompleted += OnDipCompleted;
+        handAnimator.OnPickupReached += OnPickupReached;
 
         dragHandler.OnDragEnd += OnDragEnded;
 
         stateMachine.OnStateChanged += OnStateChanged;
     }
 
-    // =====================
-    // КРЕМ
-    // =====================
     private void OnCreamTapped()
     {
         if (!stateMachine.CanInteract()) return;
 
         _hiddenCreamButton = creamButton;
-        _returnPosition    = creamButton.RectTransform.anchoredPosition;
-
-        creamButton.Hide();
+        _returnPosition = GetPickupPointInHandSpace(creamButton.PickupSourceRect);
 
         stateMachine.SetTool(MakeupStateMachine.Tool.Cream);
         stateMachine.SetState(MakeupStateMachine.State.PickingUp);
-
-        toolVisual.ShowTool(MakeupStateMachine.Tool.Cream);
+        
         handAnimator.PlayPickUp(_returnPosition.Value);
     }
 
-    // =====================
-    // СПОНЖИК
-    // =====================
     private void OnLoofahTapped()
     {
         if (!stateMachine.CanInteract()) return;
@@ -93,104 +85,137 @@ public class MakeupCoordinator : MonoBehaviour
         doneButton.SetInactive();
     }
 
-    // =====================
-    // ТЕНИ И РУМЯНА
-    // =====================
     private void OnColorButtonTapped(UIColorButton button)
     {
         if (!stateMachine.CanInteract()) return;
 
-        MakeupStateMachine.Tool tool = tabSwitcher.ActiveTool;
-        if (tool != MakeupStateMachine.Tool.Eyeshadow &&
-            tool != MakeupStateMachine.Tool.Blush) return;
-
         _selectedFaceSprite = button.FaceSprite;
-        _selectedTipColor   = button.TipColor;
-        _returnPosition     = null; // кисть уходит в дефолт
+        _selectedTipColor = button.TipColor;
+        
+        MakeupStateMachine.Tool tool = button.ToolType;
 
-        // Скрываем нужную кисточку из сцены
-        _hiddenBrushItem = tool == MakeupStateMachine.Tool.Eyeshadow
-            ? eyeshadowBrushItem
-            : blushBrushItem;
-        _hiddenBrushItem?.Hide();
+        _pendingBrushItem = tool == MakeupStateMachine.Tool.Blush
+            ? blushBrushItem
+            : eyeshadowBrushItem;
 
         stateMachine.SetTool(tool);
         stateMachine.SetState(MakeupStateMachine.State.PickingUp);
 
-        toolVisual.ShowTool(tool);
-        handAnimator.PlayDipIntoPalette(button.RectTransform.anchoredPosition);
+        Vector2 brushPickupPoint = GetPickupPointInHandSpace(_pendingBrushItem.PickupSourceRect);
+        Vector2 palettePoint = GetPickupPointInHandSpace(button.PickupSourceRect);
+        
+        palettePoint += new Vector2(0f, -35f);
+
+        handAnimator.PlayPickBrushAndDip(brushPickupPoint, palettePoint);
     }
 
-    // =====================
-    // ПОМАДА
-    // =====================
     private void OnLipstickButtonTapped(LipstickButton button)
     {
         if (!stateMachine.CanInteract()) return;
 
         _hiddenLipstickButton = button;
-        _selectedFaceSprite   = button.FaceSprite;
-        _returnPosition       = button.RectTransform.anchoredPosition;
-
-        button.Hide();
+        _selectedFaceSprite = button.FaceSprite;
+        _returnPosition = GetPickupPointInHandSpace(button.PickupSourceRect);
 
         stateMachine.SetTool(MakeupStateMachine.Tool.Lipstick);
         stateMachine.SetState(MakeupStateMachine.State.PickingUp);
-
-        toolVisual.ShowLipstick(button.TubeSprite);
+        
         handAnimator.PlayPickUp(_returnPosition.Value);
     }
 
-    // =====================
-    // КИСТЬ ОКУНУЛИ
-    // =====================
     private void OnDipCompleted()
     {
         toolVisual.SetBrushTipColor(_selectedTipColor);
     }
 
-    // =====================
-    // DRAG ЗАВЕРШЁН
-    // =====================
     private void OnDragEnded(Vector2 screenPoint)
     {
-        if (!faceZoneChecker.IsInsideFaceZone(screenPoint))
+        RectTransform faceRect = faceZoneChecker.FaceZone;
+
+        Vector2 handLocalPoint = handAnimator.HandRect.anchoredPosition;
+
+        bool inside =
+            handLocalPoint.x >= faceRect.anchoredPosition.x - faceRect.rect.width * 0.5f &&
+            handLocalPoint.x <= faceRect.anchoredPosition.x + faceRect.rect.width * 0.5f &&
+            handLocalPoint.y >= faceRect.anchoredPosition.y - faceRect.rect.height * 0.5f &&
+            handLocalPoint.y <= faceRect.anchoredPosition.y + faceRect.rect.height * 0.5f;
+
+        if (!inside)
         {
-            // Игрок отпустил вне зоны лица — отмена, возвращаем всё
             Cancel();
             return;
         }
 
-        // Переводим screenPoint в anchoredPosition
-        RectTransformUtility.ScreenPointToLocalPointInRectangle(
-            handAnimator.HandRect.parent as RectTransform,
-            screenPoint,
-            null,
-            out Vector2 localPoint
-        );
+        Vector2 applyPoint = handLocalPoint;
+
+        switch (stateMachine.CurrentTool)
+        {
+            case MakeupStateMachine.Tool.Cream:
+                applyPoint = creamApplyPoint;
+                break;
+
+            case MakeupStateMachine.Tool.Blush:
+                applyPoint = blushApplyPoint;
+                break;
+
+            case MakeupStateMachine.Tool.Eyeshadow:
+                applyPoint = eyeshadowApplyPoint;
+                break;
+
+            case MakeupStateMachine.Tool.Lipstick:
+                applyPoint = lipstickApplyPoint;
+                break;
+        }
 
         stateMachine.SetState(MakeupStateMachine.State.Applying);
 
         switch (stateMachine.CurrentTool)
         {
             case MakeupStateMachine.Tool.Cream:
-                handAnimator.PlayApplyCream(localPoint);
+                handAnimator.PlayApplyCream(applyPoint);
                 break;
+
             case MakeupStateMachine.Tool.Eyeshadow:
-                handAnimator.PlayApplyEyeshadow(localPoint);
+                handAnimator.PlayApplyEyeshadow(applyPoint);
                 break;
+
             case MakeupStateMachine.Tool.Blush:
-                handAnimator.PlayApplyBlush(localPoint);
+                handAnimator.PlayApplyBlush(applyPoint);
                 break;
+
             case MakeupStateMachine.Tool.Lipstick:
-                handAnimator.PlayApplyLipstick(localPoint);
+                handAnimator.PlayApplyLipstick(applyPoint);
+                break;
+        }
+    }
+    
+    private void OnPickupReached()
+    {
+        switch (stateMachine.CurrentTool)
+        {
+            case MakeupStateMachine.Tool.Cream:
+                _hiddenCreamButton?.Hide();
+                toolVisual.ShowTool(MakeupStateMachine.Tool.Cream);
+                break;
+
+            case MakeupStateMachine.Tool.Lipstick:
+                _hiddenLipstickButton?.Hide();
+                if (_hiddenLipstickButton != null)
+                    toolVisual.ShowLipstick(_hiddenLipstickButton.TubeSprite);
+                break;
+
+            case MakeupStateMachine.Tool.Blush:
+                _pendingBrushItem?.Hide();
+                toolVisual.ShowTool(MakeupStateMachine.Tool.Blush);
+                break;
+
+            case MakeupStateMachine.Tool.Eyeshadow:
+                _pendingBrushItem?.Hide();
+                toolVisual.ShowTool(MakeupStateMachine.Tool.Eyeshadow);
                 break;
         }
     }
 
-    // =====================
-    // ОТМЕНА (отпустил вне зоны лица)
-    // =====================
     private void Cancel()
     {
         stateMachine.SetState(MakeupStateMachine.State.Returning);
@@ -205,9 +230,6 @@ public class MakeupCoordinator : MonoBehaviour
         });
     }
 
-    // =====================
-    // АВТОАНИМАЦИЯ ЗАВЕРШЕНА
-    // =====================
     private void OnAnimationFinished()
     {
         switch (stateMachine.CurrentState)
@@ -234,9 +256,6 @@ public class MakeupCoordinator : MonoBehaviour
         }
     }
 
-    // =====================
-    // СМЕНА СОСТОЯНИЯ
-    // =====================
     private void OnStateChanged(MakeupStateMachine.State state)
     {
         if (state == MakeupStateMachine.State.Carrying)
@@ -245,9 +264,6 @@ public class MakeupCoordinator : MonoBehaviour
             dragHandler.DisableDrag();
     }
 
-    // =====================
-    // ПРИМЕНЕНИЕ МАКИЯЖА
-    // =====================
     private void ApplyCurrentMakeup()
     {
         switch (stateMachine.CurrentTool)
@@ -269,18 +285,31 @@ public class MakeupCoordinator : MonoBehaviour
         if (makeupApplier.HasAnyMakeup())
             doneButton.SetActive();
     }
+    
+    private Vector2 GetPickupPointInHandSpace(RectTransform sourceRect)
+    {
+        RectTransform handParent = handAnimator.HandRect.parent as RectTransform;
 
-    // =====================
-    // ПОКАЗАТЬ СКРЫТЫЕ ПРЕДМЕТЫ
-    // =====================
+        Vector2 screenPoint = RectTransformUtility.WorldToScreenPoint(null, sourceRect.position);
+
+        RectTransformUtility.ScreenPointToLocalPointInRectangle(
+            handParent,
+            screenPoint,
+            null,
+            out Vector2 localPoint
+        );
+
+        return localPoint;
+    }
+
     private void ShowHiddenItems()
     {
         _hiddenCreamButton?.Show();
         _hiddenLipstickButton?.Show();
         _hiddenBrushItem?.Show();
 
-        _hiddenCreamButton    = null;
+        _hiddenCreamButton = null;
         _hiddenLipstickButton = null;
-        _hiddenBrushItem      = null;
+        _hiddenBrushItem = null;
     }
 }

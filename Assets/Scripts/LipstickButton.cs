@@ -6,7 +6,8 @@ public class LipstickButton  : MonoBehaviour
 {
     [SerializeField] private Sprite tubeSprite;
     [SerializeField] private Sprite faceSprite;
-
+    [SerializeField] private RectTransform pickupSourceRect;
+    public RectTransform PickupSourceRect => pickupSourceRect;
     public RectTransform RectTransform => GetComponent<RectTransform>();
     public Sprite TubeSprite => tubeSprite;
     public Sprite FaceSprite => faceSprite;

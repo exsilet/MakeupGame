@@ -13,8 +13,11 @@ public class HandDragHandler : MonoBehaviour, IPointerDownHandler, IBeginDragHan
 
     private bool _dragEnabled = false;
 
+    public Canvas RootCanvas => rootCanvas;
+    public RectTransform HandRect => handRect;
     public void EnableDrag()  => _dragEnabled = true;
     public void DisableDrag() => _dragEnabled = false;
+    
     public void OnPointerDown(PointerEventData eventData) { }
 
     public void OnBeginDrag(PointerEventData eventData)

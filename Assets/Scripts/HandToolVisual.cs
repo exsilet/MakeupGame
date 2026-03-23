@@ -20,31 +20,26 @@ public class HandToolVisual : MonoBehaviour
     [SerializeField] private Sprite blushBrushSprite;
 
     private MakeupStateMachine.Tool _currentTool;
-
-    /// <summary>
-    /// Показывает крем, тени или румяна — фиксированные спрайты.
-    /// </summary>
+    
     public void ShowTool(MakeupStateMachine.Tool tool)
     {
         _currentTool = tool;
 
         HideAllBrushes();
-        toolImage.gameObject.SetActive(true);
-
-        toolImage.sprite = tool switch
-        {
-            MakeupStateMachine.Tool.Cream => creamSprite,
-            MakeupStateMachine.Tool.Eyeshadow => eyeBrushSprite,
-            MakeupStateMachine.Tool.Blush => blushBrushSprite,
-            _ => null
-        };
+        toolImage.gameObject.SetActive(false);
 
         switch (tool)
         {
+            case MakeupStateMachine.Tool.Cream:
+                toolImage.gameObject.SetActive(true);
+                toolImage.sprite = creamSprite;
+                break;
+
             case MakeupStateMachine.Tool.Blush:
                 if (blushBrushObject != null)
                     blushBrushObject.SetActive(true);
                 break;
+
             case MakeupStateMachine.Tool.Eyeshadow:
                 if (eyeshadowBrushObject != null)
                     eyeshadowBrushObject.SetActive(true);
@@ -57,6 +52,7 @@ public class HandToolVisual : MonoBehaviour
         _currentTool = MakeupStateMachine.Tool.Lipstick;
 
         HideAllBrushes();
+
         toolImage.gameObject.SetActive(true);
         toolImage.sprite = tubeSprite;
     }

@@ -5,15 +5,7 @@ public class FaceZoneChecker : MonoBehaviour
     [SerializeField] private RectTransform faceZone;
     [SerializeField] private Camera uiCamera;
 
-    public bool IsInsideFaceZone(Vector2 screenPoint)
-    {
-        if (faceZone == null)
-        {
-            Debug.LogWarning("[FaceZoneChecker] faceZone не назначен!");
-            return false;
-        }
-        return RectTransformUtility.RectangleContainsScreenPoint(faceZone, screenPoint, uiCamera);
-    }
+    public RectTransform FaceZone => faceZone;
 
     private void OnDrawGizmos()
     {
