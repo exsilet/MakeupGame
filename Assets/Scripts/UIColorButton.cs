@@ -8,9 +8,12 @@ public class UIColorButton : MonoBehaviour
     [SerializeField] private Color _tipColor;
     [SerializeField] private Sprite _faceSprite;
     [SerializeField] private RectTransform _pickupSourceRect;
+    [SerializeField] private RectTransform _brushDipPoint;
     [SerializeField] private MakeupStateMachine.Tool _toolType;
+
     public MakeupStateMachine.Tool ToolType => _toolType;
     public RectTransform PickupSourceRect => _pickupSourceRect;
+    public RectTransform BrushDipPoint => _brushDipPoint;
     public RectTransform RectTransform => GetComponent<RectTransform>();
     public Sprite FaceSprite => _faceSprite;
     public Color TipColor => _tipColor;

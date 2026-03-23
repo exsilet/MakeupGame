@@ -16,10 +16,20 @@ public class HandToolVisual : MonoBehaviour
 
     [Header("Спрайты инструментов")] 
     [SerializeField] private Sprite creamSprite;
-    [SerializeField] private Sprite eyeBrushSprite;
-    [SerializeField] private Sprite blushBrushSprite;
 
     private MakeupStateMachine.Tool _currentTool;
+
+    public RectTransform BlushBrushRect =>
+        blushBrushObject != null ? blushBrushObject.GetComponent<RectTransform>() : null;
+
+    public RectTransform EyeshadowBrushRect =>
+        eyeshadowBrushObject != null ? eyeshadowBrushObject.GetComponent<RectTransform>() : null;
+
+    public RectTransform BlushBrushTipRect =>
+        blushBrushTip != null ? blushBrushTip.GetComponent<RectTransform>() : null;
+
+    public RectTransform EyeshadowBrushTipRect =>
+        eyeshadowBrushTip != null ? eyeshadowBrushTip.GetComponent<RectTransform>() : null;
     
     public void ShowTool(MakeupStateMachine.Tool tool)
     {
@@ -70,6 +80,32 @@ public class HandToolVisual : MonoBehaviour
                     eyeshadowBrushTip.color = color;
                 break;
         }
+    }
+
+    public Vector2 GetBrushTipOffsetFromHand(MakeupStateMachine.Tool tool, RectTransform handRect)
+    {
+        RectTransform tip = null;
+
+        switch (tool)
+        {
+            case MakeupStateMachine.Tool.Blush:
+                tip = BlushBrushTipRect;
+                break;
+            case MakeupStateMachine.Tool.Eyeshadow:
+                tip = EyeshadowBrushTipRect;
+                break;
+        }
+
+        if (tip == null || handRect == null)
+            return Vector2.zero;
+
+        Vector3 tipWorld = tip.position;
+        Vector3 handWorld = handRect.position;
+
+        return new Vector2(
+            tipWorld.x - handWorld.x,
+            tipWorld.y - handWorld.y
+        );
     }
 
     public void HideTool()

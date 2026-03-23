@@ -91,22 +91,33 @@ public class MakeupCoordinator : MonoBehaviour
 
         _selectedFaceSprite = button.FaceSprite;
         _selectedTipColor = button.TipColor;
-        
+
         MakeupStateMachine.Tool tool = button.ToolType;
 
         _pendingBrushItem = tool == MakeupStateMachine.Tool.Blush
             ? blushBrushItem
             : eyeshadowBrushItem;
 
+        _hiddenBrushItem = _pendingBrushItem;
+        _returnPosition = GetPickupPointInHandSpace(_pendingBrushItem.PickupSourceRect);
+
         stateMachine.SetTool(tool);
         stateMachine.SetState(MakeupStateMachine.State.PickingUp);
 
         Vector2 brushPickupPoint = GetPickupPointInHandSpace(_pendingBrushItem.PickupSourceRect);
-        Vector2 palettePoint = GetPickupPointInHandSpace(button.PickupSourceRect);
-        
-        palettePoint += new Vector2(0f, -35f);
 
-        handAnimator.PlayPickBrushAndDip(brushPickupPoint, palettePoint);
+        handAnimator.HandRect.anchoredPosition = brushPickupPoint;
+        toolVisual.ShowTool(tool);
+
+        Canvas.ForceUpdateCanvases();
+
+        Vector2 dipPoint = GetPickupPointInHandSpace(button.BrushDipPoint);
+        Vector2 tipOffset = toolVisual.GetBrushTipOffsetFromHand(tool, handAnimator.HandRect);
+        Vector2 handTargetForDip = dipPoint - tipOffset;
+
+        toolVisual.HideTool();
+
+        handAnimator.PlayPickBrushAndDip(brushPickupPoint, handTargetForDip);
     }
 
     private void OnLipstickButtonTapped(LipstickButton button)
@@ -243,9 +254,17 @@ public class MakeupCoordinator : MonoBehaviour
                 stateMachine.SetState(MakeupStateMachine.State.Returning);
 
                 if (_returnPosition.HasValue)
-                    handAnimator.PlayReturn(_returnPosition.Value);
+                {
+                    handAnimator.PlayReturn(_returnPosition.Value, () =>
+                    {
+                        ShowHiddenItems();
+                        toolVisual.HideTool();
+                    });
+                }
                 else
+                {
                     handAnimator.PlayReturnToDefault();
+                }
                 break;
 
             case MakeupStateMachine.State.Returning:
